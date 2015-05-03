@@ -1,6 +1,7 @@
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Polygon_2.h>
+#include <CGAL/Delaunay_triangulation_2.h>
 #include <GLFW/glfw3.h>
 
 #include <iostream>
@@ -9,9 +10,12 @@
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef CGAL::Point_2<K> Point;
+typedef CGAL::Segment_2<K> Segment;
 typedef CGAL::Polygon_2<K> Polygon_2;
+typedef CGAL::Delaunay_triangulation_2<K> Triangulation;
 typedef Polygon_2::Vertex_iterator VertexIterator;
 typedef Polygon_2::Edge_const_iterator EdgeIterator;
+typedef Triangulation::Edge_iterator TriEdgeIterator;
 
 using std::cout; 
 using std::cin;
@@ -30,10 +34,12 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 }
 
 #define MAX_N 200
+std::string infileName = "mapleLeaf";
 bool polyInitialized = false;
 int N = 0;
 GLfloat vertices[MAX_N][2];
 
+//keep global for simplicity reasons...consider changing later
 static Polygon_2 p;
 
 void createCGAL_Polygon()
@@ -75,7 +81,7 @@ void inputPolygonFile()
   }
 
   // Open input file mapleLeaf
-  std::ifstream inFile("mapleLeaf");
+  std::ifstream inFile(infileName);
   if (!inFile.is_open())
   {
     cout << "Error attempting to open input file mapleLeaf!" << endl;
@@ -103,15 +109,49 @@ void inputPolygonFile()
         cout << "Error! Premature end of input file mapleLeaf." << endl;
         inFile.close();
         return;
-      } // end if
+      }
     inFile >> vertices[i][j];
-  } // end for j
-} // end for i
+    }
+  } 
 
-inFile.close();
-polyInitialized = true;
+  inFile.close();
+  polyInitialized = true;
 
-createCGAL_Polygon();  // Adds 2D points from global "vertices" array to global polygon p.
+  createCGAL_Polygon();  // Adds 2D points from global "vertices" array to global polygon p.
+}
+
+std::vector<Segment> internalVoronoiEdges(Polygon_2 p) {
+  Triangulation t;
+  std::vector<Segment> segments;
+  t.insert(p.vertices_begin(), p.vertices_end());
+  for(TriEdgeIterator e_it = t.edges_begin(); e_it != t.edges_end(); ++e_it) {
+    CGAL::Object o = t.dual(e_it);
+    Segment s;
+    if(CGAL::assign(s, o))
+    {
+      segments.push_back(s);
+    }
+  }
+  return segments;
+}
+
+void displayMedialAxis(Polygon_2 p) {
+  std::vector<Segment> segments = internalVoronoiEdges(p);
+
+  glLineWidth(3.0);
+  glColor3f(1.0f,1.0f,1.0f);
+  glBegin(GL_LINES);
+  bool isInside0, isInside1;
+  for(std::vector<Segment>::iterator si = segments.begin(); si != segments.end(); ++si) {
+    isInside0 = (p.bounded_side(si->vertex(0)) == CGAL::ON_BOUNDED_SIDE/* || p.bounded_side(si->vertex(0)) == CGAL::ON_BOUNDARY*/);
+    isInside1 = (p.bounded_side(si->vertex(1)) == CGAL::ON_BOUNDED_SIDE/* || p.bounded_side(si->vertex(1)) == CGAL::ON_BOUNDARY*/);
+    if(isInside0 && isInside1) {
+      glVertex2f(si->vertex(0).x(), si->vertex(0).y());
+      glVertex2f(si->vertex(1).x(), si->vertex(1).y());      
+    }
+  }
+  glEnd();
+  glFlush();
 }
 
 void displayPolygonVert(Polygon_2 p) {
@@ -125,7 +165,7 @@ void displayPolygonVert(Polygon_2 p) {
   glBegin(GL_POINTS);
   for(VertexIterator vi = p.vertices_begin(); vi != p.vertices_end(); ++vi)
   {
-    glVertex2i(vi->x(),vi->y());
+    glVertex2f(vi->x(),vi->y());
   }
   glEnd();
   glFlush();
@@ -143,75 +183,17 @@ void displayPolygonEdge(Polygon_2 p) {
   VertexIterator vi = p.vertices_begin();
   for(vi = p.vertices_begin(); vi != p.vertices_end(); ++vi)
   {
-    glVertex2i(vi->x(),vi->y());
+    glVertex2f(vi->x(),vi->y());
   }
   //to draw last edge from last point to beginning vertex, reset iterator
   vi = p.vertices_begin();
-  glVertex2i(vi->x(),vi->y());
+  glVertex2f(vi->x(),vi->y());
 
   glEnd();
   glFlush();
 }
 
-int main()
-{
-  // create a polygon and put some points in it
-  /*Polygon_2 p;
-  p.push_back(Point(0,0));
-  p.push_back(Point(4,0));
-  p.push_back(Point(4,4));
-  p.push_back(Point(2,2));
-  p.push_back(Point(0,4));*/
-
-  inputPolygonFile();
-
-  CGAL::set_pretty_mode(std::cout);
-  std::cout << "created the polygon p:" << std::endl;
-  std::cout << p << std::endl;
-  std::cout << std::endl;
-
-  // determine some properties of the polygon
-  bool IsSimple    = p.is_simple();
-  bool IsConvex    = p.is_convex();
-  bool IsClockwise = (p.orientation() == CGAL::CLOCKWISE);
-  double Area      = p.area();
-
-  std::cout << "polygon p is";
-  if (!IsSimple) std::cout << " not";
-  std::cout << " simple." << std::endl;
-
-  std::cout << "polygon p is";
-  if (!IsConvex) std::cout << " not";
-  std::cout << " convex." << std::endl;
-
-  std::cout << "polygon p is";
-  if (!IsClockwise) std::cout << " not";
-  std::cout << " clockwise oriented." << std::endl;
-
-  std::cout << "the area of polygon p is " << Area << std::endl;
-  std::cout << std::endl;
-
-  // apply some algorithms
-  Point q(-53,21);
-  std::cout << "created point q = " << q << std::endl;
-  std::cout << std::endl;
-
-  bool IsInside = (p.bounded_side(q) == CGAL::ON_BOUNDED_SIDE);
-  std::cout << "point q is";
-  if (!IsInside) std::cout << " not";
-  std::cout << " inside polygon p." << std::endl;
-  std::cout << std::endl;
-
-  // traverse the vertices and the edges
-  int n=0;
-  for (VertexIterator vi = p.vertices_begin(); vi != p.vertices_end(); ++vi)
-    std::cout << "vertex " << n++ << " = " << *vi << std::endl;
-  std::cout << std::endl;
-
-  n=0;
-  for (EdgeIterator ei = p.edges_begin(); ei != p.edges_end(); ++ei)
-    std::cout << "edge " << n++ << " = " << *ei << std::endl;
-
+void glfwDisplay(){
   //glfw window display
   GLFWwindow* window;
   glfwSetErrorCallback(error_callback);
@@ -234,17 +216,27 @@ int main()
     glfwGetFramebufferSize(window, &width, &height);
     ratio = width / (float) height;
     //fits mapleLeaf: x(min,max) = (-100.54, 1.27) | y(min,max) = (-35.32, 78.27)
-    glViewport(250, -150, width, height);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(-80.f * ratio, 80.f * ratio, -80.f, 80.f, 1.f, -1.f);
+    if(infileName == "mapleLeaf"){
+      glViewport(250, -150, width, height);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      glOrtho(-80.f * ratio, 80.f * ratio, -80.f, 80.f, 1.f, -1.f);
+    }
+    else {
+      glViewport(-250, -150 , width, height);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      glOrtho( 45.f * -ratio, 45.f * ratio, -45.f, 45.f, 1.f, -1.f); 
+    }
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
     //draw CGAL polygon
     displayPolygonVert(p);
     displayPolygonEdge(p);
+    displayMedialAxis(p);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -252,4 +244,44 @@ int main()
   glfwDestroyWindow(window);
   glfwTerminate();
   exit(EXIT_SUCCESS);
+}
+
+int main()
+{
+  //load polygon from file that contains vertices
+  inputPolygonFile();
+
+  /*
+  CGAL::set_pretty_mode(std::cout);
+  std::cout << "created the polygon p:" << std::endl;
+  std::cout << p << std::endl;
+  std::cout << std::endl;
+  */
+
+  // determine some properties of the polygon
+  bool IsSimple    = p.is_simple();
+  bool IsConvex    = p.is_convex();
+
+  std::cout << "polygon p is";
+  if (!IsSimple) std::cout << " not";
+  std::cout << " simple." << std::endl;
+
+  std::cout << "polygon p is";
+  if (!IsConvex) std::cout << " not";
+  std::cout << " convex." << std::endl;
+
+  //print out boundary vertices and edges
+  int n=0;
+  for (VertexIterator vi = p.vertices_begin(); vi != p.vertices_end(); ++vi)
+    std::cout << "vertex " << n++ << " = " << *vi << std::endl;
+  std::cout << std::endl;
+
+  n=0;
+  for (EdgeIterator ei = p.edges_begin(); ei != p.edges_end(); ++ei)
+    std::cout << "edge " << n++ << " = " << *ei << std::endl;
+  
+  //GLFW window setup and display
+  glfwDisplay();
+
+  return 0;
 }
