@@ -171,7 +171,7 @@ void glfwDisplay(Polygon_2 p, std::string infileName) {
   if (!glfwInit()) {
     exit(EXIT_FAILURE);
   }
-  window = glfwCreateWindow(640, 480, infileName, NULL, NULL);
+  window = glfwCreateWindow(640, 480, infileName.c_str(), NULL, NULL);
   if (!window)
   {
     glfwTerminate();
