@@ -1,3 +1,11 @@
+/* Gary Tse
+ * email: garystse at csu dot fullerton dot edu
+ *
+ * Description: Header file for MedialAxis.cpp. Included all 
+ *				necessary headers and typedefs. Declared all
+ *				functions to be used.
+*/
+
 #include <iostream>
 #include <fstream>
 #include <list>
@@ -43,7 +51,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 void glfwDisplay(std::string infileName);
 
 //My functions
-void createCGAL_Polygon(Polygon_2 &p, int n, GLfloat vertices[MAX_N][2]);
+void createCGALPolygon(Polygon_2 &p, int n, GLfloat vertices[MAX_N][2]);
 Polygon_2 inputPolygonFile(std::string infileName);
 std::vector<Segment> internalVoronoiEdges(Polygon_2 p);
 std::vector<Segment> internalVoronoiEdges(Polygon_2 p);

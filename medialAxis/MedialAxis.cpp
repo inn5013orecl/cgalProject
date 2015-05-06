@@ -1,25 +1,20 @@
 /* Gary Tse
-/* email: garystse at csu dot fullerton dot edu
+ * email: garystse at csu dot fullerton dot edu
  *
  * Description: Parsed an input file containing # of vertices and 
  *              vertices in x,y pairs for use in creating a polygon
  *              in 2 dimensions. Then, created a delaunay triangulation
  *              based on the convex hull of the polygon as defined by
- *              the vertices, then took the dual of that triangulation
- *              to come up with Voronoi Diagram. Checked for internal edges
- *              only to come up with Medial axis of the polygon.
+ *              the vertices, then using that triangulation, come up with
+ *              the Voronoi Diagram. Checked for internal edges
+ *              only to come up with Medial axis of the polygon. Added 
+ *              Voronoi Points for clarity.
 */
 
 #include "MedialAxis.h"
 
-void createCGAL_Polygon(Polygon_2 &p, int n, GLfloat vertices[MAX_N][2]) {
-  if (polyInitialized == false)
-  {
-    cout << "Error! Polygon has not yet been read from file mapleLeaf." << endl;
-    return;
-  }
-
-  // Adds 2D points from global "vertices" array to global polygon p.
+void createCGALPolygon(Polygon_2 &p, int n, GLfloat vertices[MAX_N][2]) {
+  assert(polyInitialized != false);
 
   printf("\nSetting up 2D Polygon Vertices:\n");
 
@@ -41,14 +36,14 @@ Polygon_2 inputPolygonFile(std::string infileName) {
   int n = 0;
   GLfloat vertices[MAX_N][2];
 
-  // Open input file mapleLeaf
+  // Open input file
   std::ifstream inFile(infileName);
   assert(inFile.is_open());
   inFile >> n;
 
   if (n > MAX_N)
   {
-    cout << "Polygon vertices exceeds maximum: " << MAX_N << endl;
+    cout << "Polygon vertices beyond max allowed: " << MAX_N << endl;
     inFile.close();
     assert(n > MAX_N);
   }
@@ -68,7 +63,7 @@ Polygon_2 inputPolygonFile(std::string infileName) {
   inFile.close();
   polyInitialized = true;
 
-  createCGAL_Polygon(poly, n, vertices);
+  createCGALPolygon(poly, n, vertices);
   return poly;
 }
 
@@ -81,6 +76,7 @@ std::vector<Point> internalVoronoiPoints(Polygon_2 p) {
     if(p.bounded_side(pt) == CGAL::ON_BOUNDED_SIDE)
     {
       points.push_back(pt);
+      //CGAL::set_pretty_mode(cout);
       //cout << pt << endl;
     }
   }
@@ -90,13 +86,18 @@ std::vector<Point> internalVoronoiPoints(Polygon_2 p) {
 std::vector<Segment> internalVoronoiEdges(Polygon_2 p) {
   Triangulation t;
   std::vector<Segment> segments;
+  bool isInside0, isInside1;
   t.insert(p.vertices_begin(), p.vertices_end());
   for(TriEdgeIterator ei = t.edges_begin(); ei != t.edges_end(); ++ei) {
     CGAL::Object o = t.dual(ei);
     Segment s;
     if(CGAL::assign(s, o))
     {
-      segments.push_back(s);
+      isInside0 = (p.bounded_side(s.vertex(0)) == CGAL::ON_BOUNDED_SIDE/* || p.bounded_side(si->vertex(0)) == CGAL::ON_BOUNDARY*/);
+      isInside1 = (p.bounded_side(s.vertex(1)) == CGAL::ON_BOUNDED_SIDE/* || p.bounded_side(si->vertex(1)) == CGAL::ON_BOUNDARY*/);
+      if(isInside0 && isInside1) {
+        segments.push_back(s);
+      }
     }
   }
   return segments;
@@ -111,12 +112,8 @@ void displayMedialAxis(Polygon_2 p) {
   glBegin(GL_LINES);
   bool isInside0, isInside1;
   for(std::vector<Segment>::iterator si = segments.begin(); si != segments.end(); ++si) {
-    isInside0 = (p.bounded_side(si->vertex(0)) == CGAL::ON_BOUNDED_SIDE/* || p.bounded_side(si->vertex(0)) == CGAL::ON_BOUNDARY*/);
-    isInside1 = (p.bounded_side(si->vertex(1)) == CGAL::ON_BOUNDED_SIDE/* || p.bounded_side(si->vertex(1)) == CGAL::ON_BOUNDARY*/);
-    if(isInside0 && isInside1) {
-      glVertex2f(si->vertex(0).x(), si->vertex(0).y());
-      glVertex2f(si->vertex(1).x(), si->vertex(1).y());      
-    }
+    glVertex2f(si->vertex(0).x(), si->vertex(0).y());
+    glVertex2f(si->vertex(1).x(), si->vertex(1).y());
   }
   glEnd();
 
@@ -124,10 +121,10 @@ void displayMedialAxis(Polygon_2 p) {
   glColor3f(1.0f,0.0f,1.0f);
   glBegin(GL_POINTS);
   for(std::vector<Point>::iterator pi = points.begin(); pi != points.end(); ++pi) {
-    isInside0 = (p.bounded_side(*pi) == CGAL::ON_BOUNDED_SIDE/* || p.bounded_side(si->vertex(0)) == CGAL::ON_BOUNDARY*/);
-    if(isInside0) {
+    //isInside0 = (p.bounded_side(*pi) == CGAL::ON_BOUNDED_SIDE/* || p.bounded_side(si->vertex(0)) == CGAL::ON_BOUNDARY*/);
+    //if(isInside0) {
       glVertex2f(pi->x(), pi->y());  
-    }
+    //}
   }
   glEnd();
 
@@ -174,7 +171,7 @@ void glfwDisplay(Polygon_2 p, std::string infileName) {
   if (!glfwInit()) {
     exit(EXIT_FAILURE);
   }
-  window = glfwCreateWindow(640, 480, "Maple Leaf", NULL, NULL);
+  window = glfwCreateWindow(640, 480, infileName, NULL, NULL);
   if (!window)
   {
     glfwTerminate();
@@ -255,7 +252,7 @@ int main(int argc, char **argv)
   if (!IsConvex) cout << " not";
   cout << " convex." << endl;
 
-  //print out convex hull
+  //print out boundary
   /*
   int n=0;
   for (VertexIterator vi = p.vertices_begin(); vi != p.vertices_end(); ++vi)
